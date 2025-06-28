@@ -66,3 +66,31 @@ body {
   padding: 10px 15px;
   cursor: pointer;
 }
+
+#controls {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#video-list.list-view {
+  grid-template-columns: 1fr;
+}
+
+#video-list.list-view .video-item {
+  flex-direction: row;
+  align-items: center;
+}
+
+#video-list.list-view .video-thumbnail {
+  width: 120px;
+  height: 80px;
+  margin-right: 10px;
+  margin-bottom: 0;
+}

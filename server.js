@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
 import { fileURLToPath } from 'url';
+import mime from 'mime-types';
 
 // Get the current file's path and directory name for ES module compatibility
 const __filename = fileURLToPath(import.meta.url);
@@ -53,35 +54,56 @@ app.get('/video', (req, res) => {
       return res.status(404).send('Video not found or path invalid');
     }
 
-    const videoPath = video.path;
-    const stat = fs.statSync(videoPath);
-    const fileSize = stat.size;
-    const range = req.headers.range;
-
-    if (range) {
-      // Parse range header for partial content requests
-      const parts = range.replace(/bytes=/, "").split("-");
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunksize = (end - start) + 1;
-      const file = fs.createReadStream(videoPath, {start, end});
-      const head = {
-        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-        'Accept-Ranges': 'bytes',
-        'Content-Length': chunksize,
-        'Content-Type': 'video/mp4',
-      };
-      // Send 206 Partial Content status for range requests
-      res.writeHead(206, head);
-      file.pipe(res);
+    if (video.codec && video.codec !== 'h264') {
+      res.setHeader('Content-Type', 'video/mp4');
+      const ffmpeg = exec(`ffmpeg -i "${video.path}" -vcodec libx264 -f mp4 -movflags frag_keyframe+empty_moov -`);
+      ffmpeg.stdout.pipe(res);
+      ffmpeg.stderr.on('data', (data) => {
+        console.error(`ffmpeg stderr: ${data}`);
+      });
+      ffmpeg.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`ffmpeg process exited with code ${code}`);
+        }
+        res.end();
+      });
     } else {
-      // Send full content for non-range requests
-      const head = {
-        'Content-Length': fileSize,
-        'Content-Type': 'video/mp4',
-      };
-      res.writeHead(200, head);
-      fs.createReadStream(videoPath).pipe(res);
+      const videoPath = video.path;
+      const stat = fs.statSync(videoPath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+      let contentType = mime.lookup(videoPath) || 'application/octet-stream';
+      if (videoPath.endsWith('.mp4')) {
+        contentType = 'video/mp4';
+      }
+
+      console.log(`Serving video: ${videoPath}, Content-Type: ${contentType}`);
+
+      if (range) {
+        // Parse range header for partial content requests
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunksize = (end - start) + 1;
+        const file = fs.createReadStream(videoPath, {start, end});
+        const head = {
+          'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': chunksize,
+          'Content-Type': contentType,
+        };
+        // Send 206 Partial Content status for range requests
+        res.writeHead(206, head);
+        file.pipe(res);
+      } else {
+        // Send full content for non-range requests
+        const head = {
+          'Content-Length': fileSize,
+          'Content-Type': contentType,
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(videoPath).pipe(res);
+      }
     }
   });
 });

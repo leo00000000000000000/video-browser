@@ -54,7 +54,7 @@ function findVideos(dir) {
           if (['.mp4', '.webm', '.ogg', '.mov'].includes(ext)) {
             // Preserve existing disabled status, default to false for new videos
             const isDisabled = existingVideos.has(fullPath) ? existingVideos.get(fullPath) : false;
-            videos.push({ path: fullPath, disabled: isDisabled, thumbnail: '' });
+            videos.push({ path: fullPath, disabled: isDisabled, thumbnail: '', codec: '' });
           }
         }
       } catch (err) {
@@ -104,6 +104,23 @@ async function generateThumbnails(videoList) {
         // Continue even if thumbnail generation fails for one video (e.g., corrupted file)
         console.error(`Failed to generate thumbnail for ${video.path}`);
       }
+    }
+
+    // Get video codec information
+    try {
+      await new Promise((resolve, reject) => {
+        exec(`ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "${video.path}"`, (error, stdout, stderr) => {
+          if (error) {
+            console.error(`Error getting codec for ${video.path}: ${error.message}`);
+            reject(error);
+          } else {
+            video.codec = stdout.trim();
+            resolve();
+          }
+        });
+      });
+    } catch (e) {
+      console.error(`Failed to get codec for ${video.path}`);
     }
   }
 }

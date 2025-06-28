@@ -10,10 +10,27 @@
 <body>
   <h1>My Videos</h1>
   <button id="sync-button">Sync Videos</button>
+
+  <div id="controls">
+    <div class="control-group">
+      <label for="sort-by">Sort By:</label>
+      <select id="sort-by">
+        <option value="filename">Filename</option>
+        <option value="codec">Codec</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label for="display-mode">Display Mode:</label>
+      <select id="display-mode">
+        <option value="grid">Grid</option>
+        <option value="list">List</option>
+      </select>
+    </div>
+  </div>
+
   <div id="video-list"></div>
   <div id="video-player" class="hidden">
     <video controls>
-      <source src="" type="video/mp4">
       Your browser does not support the video tag.
     </video>
     <button id="close-player">Close</button>
