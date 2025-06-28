@@ -34,7 +34,7 @@ async function loadVideos() {
 
     videoList.innerHTML = ''; // Clear existing list
 
-    for (const video of videos) {
+    videos.forEach((video, index) => {
       const videoItem = document.createElement('div');
       videoItem.classList.add('video-item');
 
@@ -44,6 +44,14 @@ async function loadVideos() {
       const filename = video.path.split('/').pop();
       videoThumbnail.alt = filename;
       videoThumbnail.classList.add('video-thumbnail');
+      videoThumbnail.addEventListener('click', () => {
+        // Only play video if it's not disabled
+        if (!video.disabled) {
+          videoElement.src = `/video?id=${index}`;
+          showPlayer();
+          videoElement.play();
+        }
+      });
       videoItem.appendChild(videoThumbnail);
 
       // Create and append video title (shortened if too long)
@@ -52,7 +60,7 @@ async function loadVideos() {
       videoTitle.addEventListener('click', () => {
         // Only play video if it's not disabled
         if (!video.disabled) {
-          videoElement.src = `/video?path=${encodeURIComponent(video.path)}`;
+          videoElement.src = `/video?id=${index}`;
           showPlayer();
           videoElement.play();
         }
@@ -63,7 +71,7 @@ async function loadVideos() {
       const disableCheckbox = document.createElement('input');
       disableCheckbox.type = 'checkbox';
       disableCheckbox.checked = video.disabled;
-      disableCheckbox.id = `disable-${video.path}`;
+      disableCheckbox.id = `disable-${index}`;
       disableCheckbox.addEventListener('change', async (event) => {
         const isDisabled = event.target.checked;
         try {
@@ -90,12 +98,12 @@ async function loadVideos() {
 
       // Create and append label for the disable checkbox
       const disableLabel = document.createElement('label');
-      disableLabel.htmlFor = `disable-${video.path}`;
+      disableLabel.htmlFor = `disable-${index}`;
       disableLabel.textContent = 'Disable';
       videoItem.appendChild(disableLabel);
 
       videoList.appendChild(videoItem);
-    }
+    });
   } catch (error) {
     console.error('Error loading videos:', error);
     videoList.innerHTML = 'Could not load video list. Please run the sync first.';

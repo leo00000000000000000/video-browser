@@ -23,45 +23,67 @@ app.use(express.static('public'));
 /**
  * GET /video
  * Streams a video file to the client. Supports range requests for seeking.
- * Requires 'path' query parameter with the absolute path to the video file.
+ * Requires 'id' query parameter with the index of the video in the manifest.
  */
 app.get('/video', (req, res) => {
-  const videoPath = req.query.path;
+  const videoId = parseInt(req.query.id, 10);
+  const manifestPath = path.join(__dirname, 'public', 'video-manifest.json');
 
-  // Validate video path and existence
-  if (!videoPath || !fs.existsSync(videoPath)) {
-    return res.status(404).send('Video not found');
+  if (isNaN(videoId)) {
+    return res.status(400).send('Invalid video ID');
   }
 
-  const stat = fs.statSync(videoPath);
-  const fileSize = stat.size;
-  const range = req.headers.range;
+  fs.readFile(manifestPath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading video manifest:', err);
+      return res.status(500).send('Error reading video manifest');
+    }
 
-  if (range) {
-    // Parse range header for partial content requests
-    const parts = range.replace(/bytes=/, "").split("-");
-    const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-    const chunksize = (end - start) + 1;
-    const file = fs.createReadStream(videoPath, {start, end});
-    const head = {
-      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-      'Accept-Ranges': 'bytes',
-      'Content-Length': chunksize,
-      'Content-Type': 'video/mp4',
-    };
-    // Send 206 Partial Content status for range requests
-    res.writeHead(206, head);
-    file.pipe(res);
-  } else {
-    // Send full content for non-range requests
-    const head = {
-      'Content-Length': fileSize,
-      'Content-Type': 'video/mp4',
-    };
-    res.writeHead(200, head);
-    fs.createReadStream(videoPath).pipe(res);
-  }
+    let videos;
+    try {
+      videos = JSON.parse(data);
+    } catch (parseErr) {
+      console.error('Error parsing video manifest:', parseErr);
+      return res.status(500).send('Error parsing video manifest');
+    }
+
+    const video = videos[videoId];
+
+    if (!video || !fs.existsSync(video.path)) {
+      return res.status(404).send('Video not found or path invalid');
+    }
+
+    const videoPath = video.path;
+    const stat = fs.statSync(videoPath);
+    const fileSize = stat.size;
+    const range = req.headers.range;
+
+    if (range) {
+      // Parse range header for partial content requests
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunksize = (end - start) + 1;
+      const file = fs.createReadStream(videoPath, {start, end});
+      const head = {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunksize,
+        'Content-Type': 'video/mp4',
+      };
+      // Send 206 Partial Content status for range requests
+      res.writeHead(206, head);
+      file.pipe(res);
+    } else {
+      // Send full content for non-range requests
+      const head = {
+        'Content-Length': fileSize,
+        'Content-Type': 'video/mp4',
+      };
+      res.writeHead(200, head);
+      fs.createReadStream(videoPath).pipe(res);
+    }
+  });
 });
 
 /**
